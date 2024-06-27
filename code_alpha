@@ -1,0 +1,102 @@
+# Import necessary libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+
+# Load the dataset
+# For this example, we'll use a sample stock price dataset from a CSV file.
+# You can replace 'stock_data.csv' with your own dataset.
+df = pd.read_csv('stock_data.csv')
+
+# Display the first few rows of the dataframe
+df.head()
+
+# Set the date as the index
+df['Date'] = pd.to_datetime(df['Date'])
+df.set_index('Date', inplace=True)
+
+# Use the 'Close' price for prediction
+data = df['Close'].values
+data = data.reshape(-1, 1)
+
+# Feature scaling
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaled_data = scaler.fit_transform(data)
+
+# Create training and testing datasets
+train_size = int(len(scaled_data) * 0.8)
+train_data, test_data = scaled_data[:train_size], scaled_data[train_size:]
+
+# Create a function to prepare the data for LSTM
+def create_dataset(data, time_step=1):
+    X, y = [], []
+    for i in range(len(data) - time_step - 1):
+        a = data[i:(i + time_step), 0]
+        X.append(a)
+        y.append(data[i + time_step, 0])
+    return np.array(X), np.array(y)
+
+# Prepare the data for LSTM
+time_step = 60
+X_train, y_train = create_dataset(train_data, time_step)
+X_test, y_test = create_dataset(test_data, time_step)
+
+# Reshape the input to be [samples, time steps, features]
+X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+
+# Build the LSTM model
+model = Sequential()
+model.add(LSTM(50, return_sequences=True, input_shape=(time_step, 1)))
+model.add(Dropout(0.2))
+model.add(LSTM(50, return_sequences=False))
+model.add(Dropout(0.2))
+model.add(Dense(25))
+model.add(Dense(1))
+
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# Train the model
+history = model.fit(X_train, y_train, epochs=50, batch_size=64, validation_data=(X_test, y_test), verbose=1)
+
+# Predict the stock prices
+train_predict = model.predict(X_train)
+test_predict = model.predict(X_test)
+
+# Transform back to original form
+train_predict = scaler.inverse_transform(train_predict)
+test_predict = scaler.inverse_transform(test_predict)
+y_train = scaler.inverse_transform([y_train])
+y_test = scaler.inverse_transform([y_test])
+
+# Plot the results
+plt.figure(figsize=(14, 5))
+plt.plot(df.index, data, label='Actual Stock Price')
+train_plot = np.empty_like(data)
+train_plot[:, :] = np.nan
+train_plot[time_step:len(train_predict) + time_step, :] = train_predict
+plt.plot(df.index, train_plot, label='Train Prediction')
+
+test_plot = np.empty_like(data)
+test_plot[:, :] = np.nan
+test_plot[len(train_predict) + (time_step * 2) + 1:len(data) - 1, :] = test_predict
+plt.plot(df.index, test_plot, label='Test Prediction')
+
+plt.xlabel('Date')
+plt.ylabel('Stock Price')
+plt.title('Stock Price Prediction')
+plt.legend()
+plt.show()
+
+
+
+f_t = σ(W_f * [h_{t-1}, x_t] + b_f)
+i_t = σ(W_i * [h_{t-1}, x_t] + b_i)
+o_t = σ(W_o * [h_{t-1}, x_t] + b_o)
+\tilde{C_t} = tanh(W_C * [h_{t-1}, x_t] + b_C)
+C_t = f_t * C_{t-1} + i_t * \tilde{C_t}
+h_t = o_t * tanh(C_t)
